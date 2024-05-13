@@ -82,3 +82,105 @@ def SPRINT_plus(G, c0, n_max):
     residuals = residuals / np.sqrt(m)
 
     return cs, residuals
+
+def SPRINT_minus(G):
+    """
+    PURPOSE:
+    Find approximate minima of L = |G*c|_2 / |c|_2 in nested sparse subspaces, such that L
+    increases minimally at each stage.
+
+    This variant of SPRINT starts with the full library and removes terms one at a time.
+    See SPRINT_plus to add terms one at a time.
+
+
+    INPUT:
+    G - a matrix to look for sparse null vectors of
+
+
+
+    OUTPUT:
+    cs - columns of this matrix are the increasingly sparse approximate null
+         vectors.
+    residuals - vecnorm( G*cs )/sqrt(m);
+    """
+
+    m, n = G.shape
+
+    cs = np.zeros((n, n))
+    I = np.ones(n, dtype=bool)  # logical vector indicating sparsity
+    residuals = np.zeros(n)
+
+    if m < n:
+        print("error: matrix is underdetermined.")
+        return cs, residuals
+
+    # first rotate A so it is square and upper triangular
+    _, G = np.linalg.qr(G)
+    G = G[:n, :n]
+
+    # keep a copy
+    A0 = G.copy()
+
+    while n > 0:
+        U, S, V = np.linalg.svd(G, full_matrices=False)
+        #unlike MATLAB, S is already an array! No need to process it.
+
+        cs[I, n-1] = V[:, -1]   # save out the smallest singular vector
+        residuals[n-1] = S[-1]
+
+        if n == 1:
+            break
+
+        candidates = np.zeros(n)
+        for i in range(n):
+            a = G[:, i]
+            alpha = 1 / np.linalg.norm(a)
+            w = alpha * U.T @ a
+            ws = [w[-2], w[-1]]
+
+            s = S
+            
+            bounds = [s[-1], s[-2]]
+
+            s1, s2, s = s[-1], s[-2], s[:-2]
+            w1, w2, w = w[-1], w[-2], w[:-2]
+
+            first_term = lambda sigma: (s1**2 - sigma**2) * (s2**2 - sigma**2) * alpha**2 / (s1**2 - s2**2)
+            second_term = lambda sigma: -w1**2 * (s2**2 - sigma**2) / (s1**2 - s2**2)
+            third_term = lambda sigma: -w2**2 * (s1**2 - sigma**2) / (s1**2 - s2**2)
+            fourth_term = lambda sigma: -np.sum(w**2 / (s**2 - sigma**2)) * (s1**2 - sigma**2) * (s2**2 - sigma**2) / (s1**2 - s2**2)
+
+            r = s1 / s2
+            first_term = lambda sigma: (r**2 - (sigma/s2)**2) * (s2**2 - sigma**2) * alpha**2 / (r**2 - 1)
+            second_term = lambda sigma: -w1**2 * (1**2 - (sigma/s2)**2) / (r**2 - 1)
+            third_term = lambda sigma: -w2**2 * (r**2 - (sigma/s2)**2) / (r**2 - 1)
+            fourth_term = lambda sigma: -np.sum(w**2 / ((s/s2)**2 - (sigma/s2)**2)) * (r**2 - (sigma/s2)**2) * (1 - (sigma/s2)**2) / (r**2 - 1)
+
+            f = lambda sigma: first_term(sigma) + second_term(sigma) + third_term(sigma) + fourth_term(sigma)
+
+            maxit = 128
+            threshold = 1e-130
+            g = 0
+
+            for _ in range(maxit):
+                g = np.sum(bounds) / 2  # bisection guess
+                fg = f(g)
+                if abs(fg) < threshold:
+                    break
+
+                if fg > 0:
+                    bounds[0] = g
+                else:
+                    bounds[1] = g
+            candidates[i] = g
+
+        i_min = np.argmin(candidates)
+        j = np.where(I)[0]
+        I[j[i_min]] = False
+        G = A0[:, I]
+        n -= 1
+
+    # rescale the residual
+    residuals /= np.sqrt(m)
+    return cs, residuals
+
