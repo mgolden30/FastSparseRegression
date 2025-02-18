@@ -16,7 +16,7 @@ function [cs, residuals] = exhaustive_search( A )
   end
 
   %first rotate A so it is square and upper triangular
-  [~, A] = qr(A);  A = A(1:n, 1:n);
+  [~, A] = qr(A, "econ");  A = A(1:n, 1:n);
   
   %keep a copy
   A0 = A; 
