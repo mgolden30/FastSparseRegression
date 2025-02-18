@@ -36,7 +36,7 @@ function [cs, residuals] = SPRINT_minus( G )
   end
 
   %first rotate A so it is square and upper triangular
-  [~, G] = qr(G);  G = G(1:n, 1:n);
+  [~, G] = qr(G, "econ");  G = G(1:n, 1:n);
   
   %keep a copy
   A0 = G; 
