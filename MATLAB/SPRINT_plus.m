@@ -24,7 +24,7 @@ function [cs, residuals] = SPRINT_plus( G, c0, n_max )
   end
 
   %first rotate G so it is square and upper triangular
-  [~, G] = qr(G);  
+  [~, G] = qr(G, "econ");  
   G = G(1:n, 1:n);
   
   cs = zeros(n,n);
